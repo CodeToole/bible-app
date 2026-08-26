@@ -13,11 +13,44 @@ public class BibleDbService
     private static readonly Regex PunctuationSpaceRegex = new(@"\s+([,.;:!?])", RegexOptions.Compiled);
 
     private List<Book>? _cachedBooks;
+    private bool _isInitialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     public BibleDbService()
     {
         var dbPath = ResolveDatabasePath();
         _connectionString = $"Data Source={dbPath};Mode=ReadOnly;Cache=Shared;";
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_isInitialized) return;
+
+            try
+            {
+                SQLitePCL.Batteries_V2.Init();
+            }
+            catch
+            {
+                // Ignore if already initialized or not needed
+            }
+
+            await Task.Run(async () =>
+            {
+                await GetBooksAsync();
+            });
+
+            _isInitialized = true;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     public static string CleanScriptureText(string? rawText)
