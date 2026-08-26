@@ -30,6 +30,10 @@
 
         <!-- Display name -->
         <ApplicationTitle>Bible Study App</ApplicationTitle>
+        <Company>Waitaminute Digital</Company>
+        <Authors>Waitaminute Digital</Authors>
+        <Product>Bible Study App</Product>
+        <Copyright>Copyright © 2026 Waitaminute Digital</Copyright>
 
         <!-- App Identifier -->
         <ApplicationId>com.example.biblestudyapp</ApplicationId>
