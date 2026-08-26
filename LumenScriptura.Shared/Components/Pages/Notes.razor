@@ -1,6 +1,7 @@
 @inject IUserDbService UserDb
 @inject NoteParserService NoteParser
 @inject AppStateService AppState
+@inject IJSRuntime JS
 
 <div class="notes-container">
     <!-- Header -->
@@ -65,9 +66,25 @@
 
         <!-- Right Panel: Live Auto-Expanded Study Sheet -->
         <div class="notes-right-pane">
-            <div class="study-sheet-header">@currentNote.Title</div>
-            <div class="study-sheet-meta">
-                Auto-Expanded KJV Study Sheet • @expandedBlocks.Count passage blocks detected
+            <div class="study-sheet-header-row">
+                <div>
+                    <div class="study-sheet-header">@currentNote.Title</div>
+                    <div class="study-sheet-meta">
+                        Auto-Expanded KJV Study Sheet • @expandedBlocks.Count passage blocks detected
+                    </div>
+                </div>
+
+                <div class="study-export-actions no-print">
+                    <button class="export-btn print-pdf" @onclick="ExportPdf" title="Print or Save Study Sheet as PDF">
+                        <span>📄 Export PDF</span>
+                    </button>
+                    <button class="export-btn download-txt" @onclick="DownloadTextFile" title="Download Plain Text Document for Notepad">
+                        <span>📝 Download Text (.txt)</span>
+                    </button>
+                    <button class="export-btn copy-clip" @onclick="CopyToClipboard" title="Copy formatted text to Clipboard">
+                        <span>📋 @(isCopied ? "Copied!" : "Copy")</span>
+                    </button>
+                </div>
             </div>
 
             @if (isExpanding)
@@ -112,6 +129,21 @@
                         }
                     }
                 </div>
+
+                <div class="study-sheet-export-footer no-print">
+                    <span class="export-footer-label">Export this study sheet:</span>
+                    <div class="study-export-actions">
+                        <button class="export-btn print-pdf" @onclick="ExportPdf" title="Print or Save Study Sheet as PDF">
+                            <span>📄 Export PDF</span>
+                        </button>
+                        <button class="export-btn download-txt" @onclick="DownloadTextFile" title="Download Plain Text Document for Notepad">
+                            <span>📝 Download Text (.txt)</span>
+                        </button>
+                        <button class="export-btn copy-clip" @onclick="CopyToClipboard" title="Copy formatted text to Clipboard">
+                            <span>📋 @(isCopied ? "Copied!" : "Copy to Clipboard")</span>
+                        </button>
+                    </div>
+                </div>
             }
         </div>
     </div>
@@ -123,6 +155,7 @@
     private List<ScripturePassageBlock> expandedBlocks = new();
     private bool isExpanding;
     private bool isSaved;
+    private bool isCopied;
     private CancellationTokenSource? expandCts;
 
     protected override async Task OnInitializedAsync()
@@ -221,6 +254,89 @@
             {
                 CreateNewNote();
             }
+        }
+    }
+
+    private string BuildExportPlainText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("================================================================================");
+        sb.AppendLine((string.IsNullOrWhiteSpace(currentNote.Title) ? "STUDY SHEET" : currentNote.Title).ToUpperInvariant());
+        sb.AppendLine("Holy Scripture Study Sheet — King James Version (KJV)");
+        sb.AppendLine("================================================================================");
+        sb.AppendLine();
+
+        foreach (var block in expandedBlocks)
+        {
+            if (block.IsScripture)
+            {
+                sb.AppendLine($"--- {block.ReferenceHeader} ---");
+                foreach (var v in block.Verses)
+                {
+                    sb.AppendLine($"[{v.VerseNum}] {v.Text}");
+                }
+                sb.AppendLine();
+            }
+            else if (!string.IsNullOrWhiteSpace(block.PlainText))
+            {
+                sb.AppendLine(block.PlainText);
+                sb.AppendLine();
+            }
+        }
+
+        sb.AppendLine("================================================================================");
+        sb.AppendLine("Exported from Bible Study App (LumenScriptura)");
+        return sb.ToString();
+    }
+
+    private async Task ExportPdf()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("exportHelpers.printStudySheet");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Notes] Print error: {ex.Message}");
+        }
+    }
+
+    private async Task DownloadTextFile()
+    {
+        try
+        {
+            var text = BuildExportPlainText();
+            var title = string.IsNullOrWhiteSpace(currentNote.Title) ? "Study_Notes" : currentNote.Title;
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var cleanTitle = new string(title.Where(ch => !invalidChars.Contains(ch)).ToArray()).Trim();
+            if (string.IsNullOrWhiteSpace(cleanTitle)) cleanTitle = "Study_Notes";
+            var filename = $"{cleanTitle.Replace(' ', '_')}.txt";
+
+            await JS.InvokeVoidAsync("exportHelpers.downloadTextFile", filename, text);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Notes] Download error: {ex.Message}");
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        try
+        {
+            var text = BuildExportPlainText();
+            await JS.InvokeVoidAsync("clipboardHelper.copyText", text);
+            isCopied = true;
+            StateHasChanged();
+            _ = Task.Delay(2000).ContinueWith(_ =>
+            {
+                isCopied = false;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Notes] Copy error: {ex.Message}");
         }
     }
 }

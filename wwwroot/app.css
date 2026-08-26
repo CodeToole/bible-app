@@ -1342,6 +1342,75 @@ html, body {
     padding: 6px 0;
 }
 
+/* Study Notes Export Toolbar & Buttons */
+.study-sheet-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.study-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.export-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.export-btn.print-pdf:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+}
+
+.export-btn.download-txt:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.export-btn.copy-clip:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+}
+
+.study-sheet-export-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.export-footer-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
 /* ===================================================
    SMART SEARCH MODAL (SmartSearchModal.razor)
    =================================================== */
@@ -1533,3 +1602,142 @@ html, body {
     font-size: 0.82rem;
     color: var(--text-dim);
 }
+
+/* ===================================================
+   PRINT STYLES FOR STUDY NOTES & PDF GENERATION
+   =================================================== */
+@media print {
+    /* Hide navigation, sidebar, header bar, search modals, editor, and UI buttons */
+    .sidebar,
+    .header-bar,
+    .notes-left-pane,
+    .notes-header-bar,
+    .no-print,
+    .blazor-error-ui,
+    .chapter-bottom-nav,
+    .floating-verse-toolbar,
+    .modal-overlay,
+    .auth-dropdown-menu,
+    .search-modal {
+        display: none !important;
+    }
+
+    /* Reset shell layout for full-page print */
+    html, body, .app-shell, .app-main, .app-content, .notes-container {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #111111 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        position: static !important;
+    }
+
+    .notes-split-layout {
+        display: block !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        gap: 0 !important;
+    }
+
+    /* Full-width right pane formatted for print */
+    .notes-right-pane {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 20mm 15mm !important;
+        border: none !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+    }
+
+    .study-sheet-header {
+        font-family: 'Cinzel', 'Georgia', serif !important;
+        font-size: 22pt !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
+        margin-bottom: 4pt !important;
+        border-bottom: 2pt solid #333333 !important;
+        padding-bottom: 6pt !important;
+        text-align: center !important;
+        letter-spacing: 1px !important;
+    }
+
+    .study-sheet-meta {
+        font-family: 'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif !important;
+        font-size: 10pt !important;
+        color: #555555 !important;
+        text-align: center !important;
+        margin-bottom: 18pt !important;
+        border-bottom: 1pt solid #cccccc !important;
+        padding-bottom: 8pt !important;
+    }
+
+    .study-blocks-list {
+        display: block !important;
+        gap: 0 !important;
+    }
+
+    /* Scripture passage block formatted for paper */
+    .study-scripture-block {
+        background: #ffffff !important;
+        border: 1pt solid #dddddd !important;
+        border-left: 3.5pt solid #222222 !important;
+        border-radius: 0 !important;
+        margin-bottom: 16pt !important;
+        padding: 12pt 16pt !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .study-block-ref-header {
+        font-family: 'Cinzel', 'Georgia', serif !important;
+        font-size: 13pt !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
+        margin-bottom: 8pt !important;
+        border-bottom: 1pt solid #eeeeee !important;
+        padding-bottom: 4pt !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .study-verse-row {
+        font-family: 'Merriweather', 'Georgia', serif !important;
+        font-size: 10.5pt !important;
+        line-height: 1.6 !important;
+        color: #222222 !important;
+        margin-bottom: 6pt !important;
+        text-align: justify !important;
+    }
+
+    .study-verse-num {
+        font-family: 'Hanken Grotesk', Arial, sans-serif !important;
+        font-size: 8pt !important;
+        font-weight: 700 !important;
+        color: #444444 !important;
+        margin-right: 4pt !important;
+        vertical-align: super !important;
+    }
+
+    .study-plain-block {
+        font-family: 'Merriweather', 'Georgia', serif !important;
+        font-size: 11pt !important;
+        line-height: 1.7 !important;
+        color: #333333 !important;
+        margin: 12pt 0 !important;
+        padding: 4pt 0 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+}
+
