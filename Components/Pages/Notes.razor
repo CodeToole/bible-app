@@ -1,0 +1,226 @@
+@inject UserDbService UserDb
+@inject NoteParserService NoteParser
+@inject AppStateService AppState
+
+<div class="notes-container">
+    <!-- Header -->
+    <div class="notes-header-bar">
+        <div class="notes-title-wrap">
+            <h1>Scripture Study Notes</h1>
+            <div class="notes-subtitle">Type scripture references to auto-expand complete passage sheets.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+            @if (savedNotes.Count > 0)
+            {
+                <select class="filter-select" @onchange="OnSelectExistingNote">
+                    @foreach (var n in savedNotes)
+                    {
+                        <option value="@n.Id" selected="@(currentNote.Id == n.Id)">
+                            @n.Title (@n.RelativeTime)
+                        </option>
+                    }
+                </select>
+            }
+            <button class="new-note-btn" @onclick="CreateNewNote">+ New Study Sheet</button>
+        </div>
+    </div>
+
+    <!-- Split View Layout -->
+    <div class="notes-split-layout">
+        <!-- Left Panel: Reference Input & Editor -->
+        <div class="notes-left-pane">
+            <input type="text" 
+                   class="note-title-input" 
+                   placeholder="Study Sheet Title..." 
+                   @bind="currentNote.Title" />
+
+            <div class="note-editor-instruction">
+                💡 <strong>Auto-Expansion Engine:</strong> Type scripture references like <code>EXODUS 20:1-17</code>, <code>ECCLESIASTES 12:13-14</code>, or <code>JOHN 3:16-17</code>. The right panel will automatically load full scripture text.
+            </div>
+
+            <textarea class="note-textarea" 
+                      placeholder="Type notes and passage references here (e.g. EXODUS 20:1-17)..." 
+                      @bind="currentNote.RawContent" 
+                      @bind:event="oninput" 
+                      @bind:after="TriggerExpansion"></textarea>
+
+            <div class="note-pane-actions">
+                <div style="display: flex; gap: 6px;">
+                    <button class="card-btn" @onclick="InsertSamplePassages" title="Insert Sample References">
+                        📋 Insert Samples
+                    </button>
+                    @if (currentNote.Id > 0)
+                    {
+                        <button class="card-btn delete-btn" @onclick="DeleteCurrentNote" title="Delete Note">
+                            🗑 Delete
+                        </button>
+                    }
+                </div>
+                <button class="save-note-btn" @onclick="SaveNoteAsync">
+                    💾 @(isSaved ? "Saved!" : "Save Sheet")
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Live Auto-Expanded Study Sheet -->
+        <div class="notes-right-pane">
+            <div class="study-sheet-header">@currentNote.Title</div>
+            <div class="study-sheet-meta">
+                Auto-Expanded KJV Study Sheet • @expandedBlocks.Count passage blocks detected
+            </div>
+
+            @if (isExpanding)
+            {
+                <div style="padding: 30px; text-align: center; color: var(--text-muted);">
+                    Expanding scripture passages...
+                </div>
+            }
+            else if (expandedBlocks.Count == 0)
+            {
+                <div style="padding: 40px 20px; text-align: center; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 10px; color: var(--accent-gold);">📜</div>
+                    <p style="font-size: 0.95rem;">Type a scripture reference on the left to generate the study sheet.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-dim); margin-top: 6px;">
+                        Try typing <code>EXODUS 20:1-17</code> or click <em>Insert Samples</em>.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="study-blocks-list">
+                    @foreach (var block in expandedBlocks)
+                    {
+                        @if (block.IsScripture)
+                        {
+                            <div class="study-scripture-block">
+                                <div class="study-block-ref-header">@block.ReferenceHeader</div>
+                                @foreach (var v in block.Verses)
+                                {
+                                    <div class="study-verse-row">
+                                        <span class="study-verse-num">@v.VerseNum</span>
+                                        <span>@v.Text</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="study-plain-block">
+                                @block.PlainText
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Note currentNote = new();
+    private List<Note> savedNotes = new();
+    private List<ScripturePassageBlock> expandedBlocks = new();
+    private bool isExpanding;
+    private bool isSaved;
+    private CancellationTokenSource? expandCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        savedNotes = await UserDb.GetNotesAsync();
+        if (savedNotes.Count > 0)
+        {
+            currentNote = savedNotes[0];
+            await TriggerExpansion();
+        }
+        else
+        {
+            CreateNewNote();
+            InsertSamplePassages();
+        }
+    }
+
+    private void CreateNewNote()
+    {
+        currentNote = new Note
+        {
+            Title = "Ten Commandments & Wisdom Study",
+            RawContent = "Key foundations for study:\r\nEXODUS 20:1-17\r\n\r\nConcluding wisdom:\r\nECCLESIASTES 12:13-14\r\n\r\nProphetic promises:\r\nREVELATION 22:14-15"
+        };
+        _ = TriggerExpansion();
+    }
+
+    private void InsertSamplePassages()
+    {
+        currentNote.RawContent = 
+            "The Ten Commandments:\r\nEXODUS 20:1-17\r\n\r\nThe Whole Duty of Man:\r\nECCLESIASTES 12:13-14\r\n\r\nThe Blessed Overcomers:\r\nREVELATION 22:14-15";
+        _ = TriggerExpansion();
+    }
+
+    private async Task OnSelectExistingNote(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            var found = savedNotes.FirstOrDefault(n => n.Id == id);
+            if (found != null)
+            {
+                currentNote = found;
+                await TriggerExpansion();
+            }
+        }
+    }
+
+    private async Task TriggerExpansion()
+    {
+        isSaved = false;
+        expandCts?.Cancel();
+        expandCts = new CancellationTokenSource();
+        var token = expandCts.Token;
+
+        isExpanding = true;
+        try
+        {
+            await Task.Delay(100, token);
+            if (token.IsCancellationRequested) return;
+
+            expandedBlocks = await NoteParser.ParseAndExpandAsync(currentNote.RawContent);
+        }
+        catch (TaskCanceledException) { }
+        finally
+        {
+            isExpanding = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(currentNote.Title))
+        {
+            currentNote.Title = "Untitled Study Sheet";
+        }
+
+        currentNote = await UserDb.SaveNoteAsync(currentNote);
+        savedNotes = await UserDb.GetNotesAsync();
+        isSaved = true;
+        StateHasChanged();
+    }
+
+    private async Task DeleteCurrentNote()
+    {
+        if (currentNote.Id > 0)
+        {
+            await UserDb.DeleteNoteAsync(currentNote.Id);
+            savedNotes = await UserDb.GetNotesAsync();
+            if (savedNotes.Count > 0)
+            {
+                currentNote = savedNotes[0];
+                await TriggerExpansion();
+            }
+            else
+            {
+                CreateNewNote();
+            }
+        }
+    }
+}

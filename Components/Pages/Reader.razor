@@ -1,0 +1,221 @@
+@inject BibleDbService BibleDb
+@inject UserDbService UserDb
+@inject AppStateService AppState
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="reader-canvas-wrapper">
+    <div class="reader-column">
+        <!-- Chapter Hero Banner -->
+        <div class="chapter-hero">
+            <h1 class="chapter-hero-book">@AppState.CurrentBook</h1>
+            <div class="chapter-hero-number">CHAPTER @AppState.CurrentChapter</div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div style="text-align: center; padding: 50px; color: var(--text-muted);">
+                Loading holy scriptures...
+            </div>
+        }
+        else
+        {
+            <!-- Verses Container -->
+            <div class="verses-container">
+                @foreach (var verse in verses)
+                {
+                    var isSelected = selectedVerse?.VerseNum == verse.VerseNum;
+                    var highlightClass = !string.IsNullOrEmpty(verse.HighlightColor) 
+                        ? $"highlight-{verse.HighlightColor.ToLower()}" 
+                        : "";
+                    var selectedClass = isSelected ? "selected" : "";
+
+                    <div id="@($"verse-{verse.VerseNum}")"
+                         class="verse-entry @highlightClass @selectedClass" 
+                         @onclick="() => SelectVerse(verse)">
+                        <span class="verse-num-badge">@verse.VerseNum</span>
+                        @if (verse.IsBookmarked)
+                        {
+                            <span class="verse-bookmark-flag" title="Bookmarked">🔖</span>
+                        }
+                        <span>@verse.Text</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Chapter Navigation Bottom Controls -->
+            <div class="chapter-bottom-nav">
+                <button class="nav-jump-button" 
+                        disabled="@(AppState.CurrentChapter <= 1)"
+                        @onclick="() => AppState.PrevChapter()">
+                    <span>← Previous Chapter</span>
+                </button>
+                <button class="nav-jump-button" 
+                        disabled="@(AppState.CurrentChapter >= AppState.TotalChapters)"
+                        @onclick="() => AppState.NextChapter()">
+                    <span>Next Chapter →</span>
+                </button>
+            </div>
+        }
+
+        <!-- Floating Verse Action Toolbar -->
+        @if (selectedVerse != null)
+        {
+            <div class="floating-verse-toolbar">
+                <span class="toolbar-ref-label">@selectedVerse.Reference</span>
+                
+                <div class="toolbar-color-group" title="Highlight in Gold, Blue, or Neutral">
+                    <button class="color-dot-btn gold" 
+                            title="Gold Highlight" 
+                            @onclick='() => SetHighlight("gold")'></button>
+                    <button class="color-dot-btn blue" 
+                            title="Blue Highlight" 
+                            @onclick='() => SetHighlight("blue")'></button>
+                    <button class="color-dot-btn neutral" 
+                            title="Neutral Highlight" 
+                            @onclick='() => SetHighlight("neutral")'></button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(selectedVerse.HighlightColor))
+                {
+                    <button class="toolbar-action-btn" title="Remove Highlight" @onclick="RemoveHighlight">
+                        <span>✖ Clear</span>
+                    </button>
+                }
+
+                <button class="toolbar-action-btn" title="Toggle Bookmark" @onclick="ToggleBookmark">
+                    <span>@(selectedVerse.IsBookmarked ? "🔖 Remove" : "🔖 Bookmark")</span>
+                </button>
+
+                <button class="toolbar-action-btn" title="Copy verse text" @onclick="CopyVerse">
+                    <span>📋 @(copied ? "Copied!" : "Copy")</span>
+                </button>
+
+                <button class="toolbar-close-btn" title="Close toolbar" @onclick="ClearSelection">
+                    ✕
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Verse> verses = new();
+    private Verse? selectedVerse;
+    private bool isLoading;
+    private bool copied;
+    private string lastLoadedKey = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += HandleAppStateChange;
+        await LoadChapterDataAsync();
+    }
+
+    private void HandleAppStateChange()
+    {
+        var key = $"{AppState.CurrentBook}_{AppState.CurrentChapter}";
+        if (key != lastLoadedKey)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await LoadChapterDataAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task LoadChapterDataAsync()
+    {
+        isLoading = true;
+        selectedVerse = null;
+        lastLoadedKey = $"{AppState.CurrentBook}_{AppState.CurrentChapter}";
+
+        try
+        {
+            // Fetch verses from BibleDbService
+            verses = await BibleDb.GetChapterVersesAsync(AppState.CurrentBook, AppState.CurrentChapter);
+
+            // Fetch highlights & bookmarks for this chapter
+            var highlights = await UserDb.GetChapterHighlightsAsync(AppState.CurrentBook, AppState.CurrentChapter);
+            var bookmarks = await UserDb.GetChapterBookmarksAsync(AppState.CurrentBook, AppState.CurrentChapter);
+
+            foreach (var v in verses)
+            {
+                if (highlights.TryGetValue(v.VerseNum, out var color))
+                {
+                    v.HighlightColor = color;
+                }
+                v.IsBookmarked = bookmarks.Contains(v.VerseNum);
+            }
+
+            // Record reading history
+            await UserDb.AddHistoryAsync(AppState.CurrentBook, AppState.CurrentChapter);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+
+        // Check if there was a target verse to scroll to
+        if (AppState.TargetVerse.HasValue)
+        {
+            var vNum = AppState.TargetVerse.Value;
+            AppState.ClearTargetVerse();
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(200);
+                await JS.InvokeVoidAsync("uiHelper.scrollToElement", $"verse-{vNum}");
+            });
+        }
+    }
+
+    private void SelectVerse(Verse verse)
+    {
+        selectedVerse = verse;
+        copied = false;
+    }
+
+    private void ClearSelection()
+    {
+        selectedVerse = null;
+    }
+
+    private async Task SetHighlight(string color)
+    {
+        if (selectedVerse == null) return;
+        selectedVerse.HighlightColor = color;
+        await UserDb.SaveHighlightAsync(selectedVerse.Reference, selectedVerse.Text, color);
+        StateHasChanged();
+    }
+
+    private async Task RemoveHighlight()
+    {
+        if (selectedVerse == null) return;
+        selectedVerse.HighlightColor = null;
+        await UserDb.DeleteHighlightByReferenceAsync(selectedVerse.Reference);
+        StateHasChanged();
+    }
+
+    private async Task ToggleBookmark()
+    {
+        if (selectedVerse == null) return;
+        var bookmarked = await UserDb.ToggleBookmarkAsync(selectedVerse.BookName, selectedVerse.Chapter, selectedVerse.VerseNum);
+        selectedVerse.IsBookmarked = bookmarked;
+        StateHasChanged();
+    }
+
+    private async Task CopyVerse()
+    {
+        if (selectedVerse == null) return;
+        var copyText = $"\"{selectedVerse.Text}\" — {selectedVerse.Reference} (KJV)";
+        await JS.InvokeVoidAsync("clipboardHelper.copyText", copyText);
+        copied = true;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= HandleAppStateChange;
+    }
+}

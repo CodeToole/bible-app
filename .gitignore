@@ -1,0 +1,25 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio / VS Code
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.user
+*.userosscache
+*.sln.docstates
+
+## User Database & Local AppData
+user_data.db*
+*.db-shm
+*.db-wal
+
+## OS generated files
+.DS_Store
+Thumbs.db

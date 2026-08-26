@@ -1,0 +1,304 @@
+@using System.Text.RegularExpressions
+@inject BibleDbService BibleDb
+@inject NoteParserService NoteParser
+@inject AppStateService AppState
+@implements IDisposable
+
+@if (AppState.IsSearchOpen)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <!-- Modal Header & Search Box -->
+            <div class="modal-search-header">
+                <span class="search-modal-icon">🔍</span>
+                <input type="text" 
+                       class="search-modal-input" 
+                       placeholder="Type a book (e.g. 'ja'), chapter ('James 3'), verse ('John 3:16'), or keywords..." 
+                       @bind="SearchQuery" 
+                       @bind:event="oninput" 
+                       @ref="searchInputRef"
+                       autofocus />
+                <button class="search-close-btn" @onclick="CloseModal" title="Close (Esc)">✕</button>
+            </div>
+
+            <!-- Results Scroll Area -->
+            <div class="modal-results-scroll">
+                @if (isLoading)
+                {
+                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                        Searching scriptures...
+                    </div>
+                }
+                else if (string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    <div style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+                        <p style="font-size: 0.95rem; margin-bottom: 8px;">Try typing:</p>
+                        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                            <span class="search-kbd" style="cursor:pointer;" @onclick='() => SetSample("ja")'>ja</span>
+                            <span class="search-kbd" style="cursor:pointer;" @onclick='() => SetSample("James 3")'>James 3</span>
+                            <span class="search-kbd" style="cursor:pointer;" @onclick='() => SetSample("John 3:16")'>John 3:16</span>
+                            <span class="search-kbd" style="cursor:pointer;" @onclick='() => SetSample("light in darkness")'>light in darkness</span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- 1. Direct Verse Lookup Preview -->
+                    @if (matchedVerse != null)
+                    {
+                        <div class="suggestion-card-header">Direct Verse Lookup</div>
+                        <div class="search-verse-preview-card" @onclick="() => JumpToVerse(matchedVerse)">
+                            <div class="preview-ref">@matchedVerse.Reference</div>
+                            <div class="preview-text">@matchedVerse.Text</div>
+                            <div style="margin-top: 8px; font-size: 0.78rem; color: var(--accent-gold);">
+                                Click to open in Reader →
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 2. Direct Chapter Jump Action -->
+                    @if (matchedChapterJump != null)
+                    {
+                        <div class="suggestion-card-header">Chapter Jump</div>
+                        <div class="search-suggestion-card" 
+                             style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;"
+                             @onclick="() => JumpToChapter(matchedChapterJump.Value.book, matchedChapterJump.Value.chapter)">
+                            <div>
+                                <div class="suggestion-book-title" style="margin-bottom: 0;">
+                                    @matchedChapterJump.Value.book.LongName Chapter @matchedChapterJump.Value.chapter
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                    Jump directly to @matchedChapterJump.Value.book.LongName @matchedChapterJump.Value.chapter
+                                </div>
+                            </div>
+                            <span style="color: var(--accent-gold); font-size: 1.2rem;">→</span>
+                        </div>
+                    }
+
+                    <!-- 3. Partial Book Matching Suggestion -->
+                    @if (suggestedBooks.Count > 0)
+                    {
+                        <div class="suggestion-card-header">Book Suggestions</div>
+                        @foreach (var sBook in suggestedBooks)
+                        {
+                            <div class="search-suggestion-card">
+                                <div class="suggestion-book-title">@sBook.LongName</div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px;">
+                                    Select a chapter (1 to @sBook.TotalChapters):
+                                </div>
+                                <div class="suggestion-chapters-grid">
+                                    @for (int c = 1; c <= Math.Min(sBook.TotalChapters, 30); c++)
+                                    {
+                                        var ch = c;
+                                        <button class="chapter-tile-btn" @onclick="() => JumpToChapter(sBook, ch)">
+                                            @ch
+                                        </button>
+                                    }
+                                </div>
+                                @if (sBook.TotalChapters > 30)
+                                {
+                                    <div class="suggestion-chapters-grid" style="margin-top: 5px;">
+                                        @for (int c = 31; c <= sBook.TotalChapters; c++)
+                                        {
+                                            var ch = c;
+                                            <button class="chapter-tile-btn" @onclick="() => JumpToChapter(sBook, ch)">
+                                                @ch
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+
+                    <!-- 4. Full-Text Keyword Search Results -->
+                    @if (keywordResults.Count > 0)
+                    {
+                        <div class="suggestion-card-header">Keyword Results (@keywordResults.Count)</div>
+                        @foreach (var verse in keywordResults)
+                        {
+                            <div class="search-verse-preview-card" @onclick="() => JumpToVerse(verse)">
+                                <div class="preview-ref">@verse.Reference</div>
+                                <div class="preview-text">
+                                    @((MarkupString)HighlightQuery(verse.Text, SearchQuery))
+                                </div>
+                            </div>
+                        }
+                    }
+                    else if (suggestedBooks.Count == 0 && matchedVerse == null && matchedChapterJump == null)
+                    {
+                        <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+                            No scripture matches found for "@SearchQuery".
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string searchQuery = string.Empty;
+    private ElementReference searchInputRef;
+    private bool isLoading;
+
+    private Verse? matchedVerse;
+    private (Book book, int chapter)? matchedChapterJump;
+    private List<Book> suggestedBooks = new();
+    private List<Verse> keywordResults = new();
+    private List<Book> allBooks = new();
+
+    private CancellationTokenSource? searchCts;
+
+    public string SearchQuery
+    {
+        get => searchQuery;
+        set
+        {
+            if (searchQuery != value)
+            {
+                searchQuery = value;
+                TriggerSearch();
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+        allBooks = await BibleDb.GetBooksAsync();
+    }
+
+    private void SetSample(string sample)
+    {
+        SearchQuery = sample;
+    }
+
+    private void TriggerSearch()
+    {
+        searchCts?.Cancel();
+        searchCts = new CancellationTokenSource();
+        var token = searchCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(150, token); // Debounce
+            if (token.IsCancellationRequested) return;
+
+            await InvokeAsync(async () =>
+            {
+                await ProcessSearchAsync(searchQuery);
+                StateHasChanged();
+            });
+        }, token);
+    }
+
+    private async Task ProcessSearchAsync(string q)
+    {
+        var trimmed = q?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            matchedVerse = null;
+            matchedChapterJump = null;
+            suggestedBooks.Clear();
+            keywordResults.Clear();
+            return;
+        }
+
+        isLoading = true;
+        matchedVerse = null;
+        matchedChapterJump = null;
+        suggestedBooks.Clear();
+        keywordResults.Clear();
+
+        try
+        {
+            // Case 1: Check if query is a verse reference like "John 3:16"
+            if (NoteParser.TryParseReference(trimmed, out var bookStr, out var chapter, out var startVerse, out var _))
+            {
+                var book = allBooks.FirstOrDefault(b => 
+                    b.LongName.Equals(bookStr, StringComparison.OrdinalIgnoreCase) || 
+                    b.ShortName.Equals(bookStr, StringComparison.OrdinalIgnoreCase));
+                
+                if (book != null)
+                {
+                    matchedVerse = await BibleDb.GetVerseAsync(book.LongName, chapter, startVerse);
+                }
+            }
+
+            // Case 2: Check if query is a chapter jump like "James 3" or "Gen 1"
+            var chapterJumpRegex = new Regex(@"^([1-3]?\s?[A-Za-z]+)\s+([0-9]+)$", RegexOptions.IgnoreCase);
+            var chMatch = chapterJumpRegex.Match(trimmed);
+            if (chMatch.Success)
+            {
+                var bName = chMatch.Groups[1].Value.Trim();
+                var chNum = int.Parse(chMatch.Groups[2].Value);
+                var book = allBooks.FirstOrDefault(b => 
+                    b.LongName.Equals(bName, StringComparison.OrdinalIgnoreCase) || 
+                    b.ShortName.Equals(bName, StringComparison.OrdinalIgnoreCase));
+                
+                if (book != null && chNum >= 1 && chNum <= book.TotalChapters)
+                {
+                    matchedChapterJump = (book, chNum);
+                }
+            }
+
+            // Case 3: Check partial book name match like "ja" -> James
+            if (trimmed.Length >= 2 && !trimmed.Contains(':'))
+            {
+                suggestedBooks = allBooks
+                    .Where(b => b.LongName.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase) ||
+                                b.ShortName.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
+                    .Take(3)
+                    .ToList();
+            }
+
+            // Case 4: Full-text keyword search across 31,102 verses
+            if (trimmed.Length >= 3 && matchedVerse == null)
+            {
+                keywordResults = await BibleDb.SearchVersesAsync(trimmed, 30);
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string HighlightQuery(string text, string q)
+    {
+        if (string.IsNullOrWhiteSpace(q)) return System.Net.WebUtility.HtmlEncode(text);
+        var pattern = Regex.Escape(q.Trim());
+        var encoded = System.Net.WebUtility.HtmlEncode(text);
+        return Regex.Replace(encoded, pattern, $"<mark class='search-highlight'>$&</mark>", RegexOptions.IgnoreCase);
+    }
+
+    private void JumpToVerse(Verse verse)
+    {
+        var book = allBooks.FirstOrDefault(b => b.LongName.Equals(verse.BookName, StringComparison.OrdinalIgnoreCase));
+        if (book != null)
+        {
+            AppState.TotalChapters = book.TotalChapters;
+        }
+        AppState.NavigateTo(verse.BookName, verse.Chapter, verse.VerseNum);
+        CloseModal();
+    }
+
+    private void JumpToChapter(Book book, int chapter)
+    {
+        AppState.TotalChapters = book.TotalChapters;
+        AppState.NavigateTo(book.LongName, chapter);
+        CloseModal();
+    }
+
+    private void CloseModal()
+    {
+        AppState.SetSearchOpen(false);
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+        searchCts?.Dispose();
+    }
+}

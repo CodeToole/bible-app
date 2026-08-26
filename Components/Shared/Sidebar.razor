@@ -1,0 +1,190 @@
+@inject BibleDbService BibleDb
+@inject UserDbService UserDb
+@inject AppStateService AppState
+@implements IDisposable
+
+<aside class="sidebar @(AppState.IsSidebarCollapsed ? "collapsed" : "")">
+    <!-- Branding Header -->
+    <div class="sidebar-branding">
+        <div class="brand-title-wrap">
+            <span class="brand-cross">†</span>
+            <div class="brand-text-block">
+                <span class="brand-name">Lumen Scriptura</span>
+                <span class="brand-version">King James Version</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scrollable Body -->
+    <div class="sidebar-scroll-content">
+        <!-- Library Navigation Links -->
+        <div class="nav-section-title">Library</div>
+        <div class="library-links-list">
+            <button class="library-link-btn @(AppState.ActiveView == "reader" ? "active" : "")" 
+                    @onclick="@(() => AppState.SetView("reader"))">
+                <span class="library-icon">📖</span>
+                <span>Current Reader</span>
+            </button>
+            <button class="library-link-btn @(AppState.ActiveView == "highlights" ? "active" : "")" 
+                    @onclick="@(() => AppState.SetView("highlights"))">
+                <span class="library-icon">✨</span>
+                <span>Highlights & Bookmarks</span>
+            </button>
+            <button class="library-link-btn @(AppState.ActiveView == "notes" ? "active" : "")" 
+                    @onclick="@(() => AppState.SetView("notes"))">
+                <span class="library-icon">📝</span>
+                <span>Auto-Expanded Notes</span>
+            </button>
+            <button class="library-link-btn @(AppState.ActiveView == "history" ? "active" : "")" 
+                    @onclick="@(() => AppState.SetView("history"))">
+                <span class="library-icon">⏳</span>
+                <span>Reading History</span>
+            </button>
+        </div>
+
+        <!-- Scripture Accordions -->
+        <div class="nav-section-title">Holy Scriptures</div>
+
+        <!-- Old Testament (39 Books) -->
+        <div class="testament-accordion">
+            <button class="accordion-header-btn" @onclick="ToggleOt">
+                <span>@(otExpanded ? "▾" : "▸") Old Testament</span>
+                <span class="accordion-badge">39 Books</span>
+            </button>
+
+            @if (otExpanded)
+            {
+                <div class="books-list">
+                    @foreach (var book in otBooks)
+                    {
+                        var isCurrentBook = AppState.CurrentBook.Equals(book.LongName, StringComparison.OrdinalIgnoreCase);
+                        var isExpanded = expandedBookName == book.LongName;
+
+                        <div class="book-item">
+                            <button class="book-row-btn @(isCurrentBook ? "expanded" : "")" 
+                                    @onclick="() => ToggleBookChapters(book)">
+                                <span>@(isExpanded ? "▾ " : "▸ ")@book.LongName</span>
+                                <span class="book-chapter-count">@book.TotalChapters ch</span>
+                            </button>
+
+                            @if (isExpanded)
+                            {
+                                <div class="inline-chapter-grid">
+                                    @for (int ch = 1; ch <= book.TotalChapters; ch++)
+                                    {
+                                        var chapterNum = ch;
+                                        var isActive = isCurrentBook && AppState.CurrentChapter == chapterNum;
+                                        <button class="chapter-tile-btn @(isActive ? "active" : "")" 
+                                                @onclick="() => SelectChapter(book, chapterNum)">
+                                            @chapterNum
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- New Testament (27 Books) -->
+        <div class="testament-accordion">
+            <button class="accordion-header-btn" @onclick="ToggleNt">
+                <span>@(ntExpanded ? "▾" : "▸") New Testament</span>
+                <span class="accordion-badge">27 Books</span>
+            </button>
+
+            @if (ntExpanded)
+            {
+                <div class="books-list">
+                    @foreach (var book in ntBooks)
+                    {
+                        var isCurrentBook = AppState.CurrentBook.Equals(book.LongName, StringComparison.OrdinalIgnoreCase);
+                        var isExpanded = expandedBookName == book.LongName;
+
+                        <div class="book-item">
+                            <button class="book-row-btn @(isCurrentBook ? "expanded" : "")" 
+                                    @onclick="() => ToggleBookChapters(book)">
+                                <span>@(isExpanded ? "▾ " : "▸ ")@book.LongName</span>
+                                <span class="book-chapter-count">@book.TotalChapters ch</span>
+                            </button>
+
+                            @if (isExpanded)
+                            {
+                                <div class="inline-chapter-grid">
+                                    @for (int ch = 1; ch <= book.TotalChapters; ch++)
+                                    {
+                                        var chapterNum = ch;
+                                        var isActive = isCurrentBook && AppState.CurrentChapter == chapterNum;
+                                        <button class="chapter-tile-btn @(isActive ? "active" : "")" 
+                                                @onclick="() => SelectChapter(book, chapterNum)">
+                                            @chapterNum
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Sidebar Footer: Recent Reads -->
+    <div class="sidebar-footer">
+        <button class="recent-reads-btn" @onclick="ShowRecentReads">
+            <span>⏱ Recent Reads</span>
+        </button>
+    </div>
+</aside>
+
+@code {
+    private List<Book> otBooks = new();
+    private List<Book> ntBooks = new();
+    private bool otExpanded = true;
+    private bool ntExpanded = true;
+    private string? expandedBookName = "Genesis";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+
+        var allBooks = await BibleDb.GetBooksAsync();
+        otBooks = allBooks.Where(b => !b.IsNewTestament).ToList();
+        ntBooks = allBooks.Where(b => b.IsNewTestament).ToList();
+
+        // Set initial expanded book matching current
+        expandedBookName = AppState.CurrentBook;
+    }
+
+    private void ToggleOt() => otExpanded = !otExpanded;
+    private void ToggleNt() => ntExpanded = !ntExpanded;
+
+    private void ToggleBookChapters(Book book)
+    {
+        if (expandedBookName == book.LongName)
+        {
+            expandedBookName = null;
+        }
+        else
+        {
+            expandedBookName = book.LongName;
+        }
+    }
+
+    private void SelectChapter(Book book, int chapter)
+    {
+        AppState.TotalChapters = book.TotalChapters;
+        AppState.NavigateTo(book.LongName, chapter);
+    }
+
+    private void ShowRecentReads()
+    {
+        AppState.SetView("history");
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

@@ -1,0 +1,73 @@
+@inject AppStateService AppState
+@implements IDisposable
+
+<header class="header-bar">
+    <div class="header-left">
+        <button class="sidebar-toggle-btn" title="Toggle Navigation Sidebar" @onclick="ToggleSidebar">
+            ☰
+        </button>
+        <div class="breadcrumb-nav">
+            <button class="chapter-step-btn" 
+                    title="Previous Chapter" 
+                    disabled="@(AppState.CurrentChapter <= 1)"
+                    @onclick="() => AppState.PrevChapter()">
+                ‹
+            </button>
+            <span class="breadcrumb-title">@AppState.CurrentBook @AppState.CurrentChapter</span>
+            <button class="chapter-step-btn" 
+                    title="Next Chapter" 
+                    disabled="@(AppState.CurrentChapter >= AppState.TotalChapters)"
+                    @onclick="() => AppState.NextChapter()">
+                ›
+            </button>
+        </div>
+    </div>
+
+    <div class="header-center">
+        <button class="view-tab-btn @(AppState.ActiveView == "reader" ? "active" : "")" 
+                @onclick="@(() => AppState.SetView("reader"))">
+            📖 Scripture
+        </button>
+        <button class="view-tab-btn @(AppState.ActiveView == "highlights" ? "active" : "")" 
+                @onclick="@(() => AppState.SetView("highlights"))">
+            ✨ Highlights
+        </button>
+        <button class="view-tab-btn @(AppState.ActiveView == "notes" ? "active" : "")" 
+                @onclick="@(() => AppState.SetView("notes"))">
+            📝 Study Notes
+        </button>
+        <button class="view-tab-btn @(AppState.ActiveView == "history" ? "active" : "")" 
+                @onclick="@(() => AppState.SetView("history"))">
+            ⏳ History
+        </button>
+    </div>
+
+    <div class="header-right">
+        <button class="search-trigger-btn" @onclick="OpenSearch" title="Search Books, Chapters, Verses (Ctrl+K)">
+            <span>🔍 Search Scriptures...</span>
+            <kbd class="search-kbd">Ctrl+K</kbd>
+        </button>
+    </div>
+</header>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void ToggleSidebar()
+    {
+        AppState.ToggleSidebar();
+    }
+
+    private void OpenSearch()
+    {
+        AppState.SetSearchOpen(true);
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

@@ -1,0 +1,116 @@
+@inject UserDbService UserDb
+@inject AppStateService AppState
+
+<div class="highlights-container">
+    <!-- Header -->
+    <div class="highlights-header">
+        <div class="highlights-title-block">
+            <h1>Reading History & Bookmarks</h1>
+            <div class="highlights-subtitle">Recently read chapters and quick return marks.</div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+            <button class="view-tab-btn @(activeTab == "history" ? "active" : "")" 
+                    @onclick='() => activeTab = "history"'>
+                ⏱ History (@historyItems.Count)
+            </button>
+            <button class="view-tab-btn @(activeTab == "bookmarks" ? "active" : "")" 
+                    @onclick='() => activeTab = "bookmarks"'>
+                🔖 Bookmarks (@bookmarks.Count)
+            </button>
+        </div>
+    </div>
+
+    @if (activeTab == "history")
+    {
+        @if (historyItems.Count == 0)
+        {
+            <div class="empty-state-card">
+                <div class="empty-icon">⏳</div>
+                <h3 style="margin-bottom: 8px; color: var(--text-primary);">No Reading History Yet</h3>
+                <p style="font-size: 0.9rem;">Chapters you read will automatically be recorded here.</p>
+            </div>
+        }
+        else
+        {
+            <div class="highlights-grid">
+                @foreach (var item in historyItems)
+                {
+                    <div class="history-item-card" @onclick="() => JumpToHistory(item)">
+                        <div>
+                            <div class="history-ref">@item.Reference</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                King James Version • @item.Book
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <span class="history-time">@item.RelativeTime</span>
+                            <span style="color: var(--accent-gold); font-size: 1.1rem;">→</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @if (bookmarks.Count == 0)
+        {
+            <div class="empty-state-card">
+                <div class="empty-icon">🔖</div>
+                <h3 style="margin-bottom: 8px; color: var(--text-primary);">No Bookmarks Yet</h3>
+                <p style="font-size: 0.9rem;">Click the bookmark icon on any verse while reading to save it here.</p>
+            </div>
+        }
+        else
+        {
+            <div class="highlights-grid">
+                @foreach (var bm in bookmarks)
+                {
+                    <div class="history-item-card" style="border-left: 4px solid var(--accent-gold);">
+                        <div @onclick="() => JumpToBookmark(bm)" style="flex: 1; cursor: pointer;">
+                            <div class="history-ref">@bm.Reference</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                Saved @bm.RelativeTime
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button class="card-btn delete-btn" @onclick="() => DeleteBookmark(bm.Id)">
+                                🗑 Remove
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string activeTab = "history";
+    private List<HistoryItem> historyItems = new();
+    private List<Bookmark> bookmarks = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        historyItems = await UserDb.GetHistoryAsync(50);
+        bookmarks = await UserDb.GetBookmarksAsync();
+    }
+
+    private void JumpToHistory(HistoryItem item)
+    {
+        AppState.NavigateTo(item.Book, item.Chapter);
+    }
+
+    private void JumpToBookmark(Bookmark bm)
+    {
+        AppState.NavigateTo(bm.Book, bm.Chapter, bm.Verse);
+    }
+
+    private async Task DeleteBookmark(int id)
+    {
+        await UserDb.DeleteBookmarkAsync(id);
+        bookmarks.RemoveAll(b => b.Id == id);
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,63 @@
+@inherits LayoutComponentBase
+@inject AppStateService AppState
+@implements IDisposable
+
+<div class="app-shell" @onkeydown="HandleKeyDown" tabindex="0">
+    <!-- Sidebar Drawer with OT/NT Accordions & Inline Chapter Grid -->
+    <Sidebar />
+
+    <!-- Main View Canvas -->
+    <div class="app-main">
+        <HeaderBar />
+
+        <main class="app-content">
+            @if (AppState.ActiveView == "reader")
+            {
+                <Reader />
+            }
+            else if (AppState.ActiveView == "highlights")
+            {
+                <Highlights />
+            }
+            else if (AppState.ActiveView == "notes")
+            {
+                <Notes />
+            }
+            else if (AppState.ActiveView == "history")
+            {
+                <HistoryView />
+            }
+            else
+            {
+                @Body
+            }
+        </main>
+    </div>
+
+    <!-- Global Smart Search Modal -->
+    <SmartSearchModal />
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && (e.Key == "k" || e.Key == "K"))
+        {
+            AppState.SetSearchOpen(true);
+        }
+        else if (e.Key == "Escape" && AppState.IsSearchOpen)
+        {
+            AppState.SetSearchOpen(false);
+        }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

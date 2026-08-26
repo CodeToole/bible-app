@@ -1,0 +1,134 @@
+@inject UserDbService UserDb
+@inject AppStateService AppState
+@inject BibleDbService BibleDb
+
+<div class="highlights-container">
+    <!-- Header -->
+    <div class="highlights-header">
+        <div class="highlights-title-block">
+            <h1>Your Highlights</h1>
+            <div class="highlights-subtitle">Saved passages and annotations.</div>
+        </div>
+
+        <div class="highlights-filter-wrap">
+            <span class="filter-label">Sort by:</span>
+            <select class="filter-select" @bind="SortOrder" @bind:after="ApplySort">
+                <option value="recent">Recent</option>
+                <option value="reference">Reference</option>
+                <option value="color">Color</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Highlights List -->
+    @if (isLoading)
+    {
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            Loading saved highlights...
+        </div>
+    }
+    else if (highlights.Count == 0)
+    {
+        <div class="empty-state-card">
+            <div class="empty-icon">✨</div>
+            <h3 style="margin-bottom: 8px; color: var(--text-primary);">No Highlights Yet</h3>
+            <p style="font-size: 0.9rem;">
+                Select any verse in the scripture reader to highlight it in Gold, Blue, or Neutral.
+            </p>
+            <button class="nav-jump-button" style="margin: 18px auto 0;" @onclick="@(() => AppState.SetView("reader"))">
+                Open Scripture Reader
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="highlights-grid">
+            @foreach (var hl in highlights)
+            {
+                <div class="highlight-card @hl.Color.ToLower()">
+                    <div class="card-top-row">
+                        <div class="card-ref-badge">
+                            <span class="color-indicator-dot @hl.Color.ToLower()"></span>
+                            <span class="card-ref-title" @onclick="() => NavigateToVerse(hl.VerseRef)">
+                                @hl.VerseRef
+                            </span>
+                        </div>
+                        <span class="card-date-label">Added @hl.RelativeTime</span>
+                    </div>
+
+                    <div class="card-quote-text">
+                        "@hl.Text"
+                    </div>
+
+                    <div class="card-actions-row">
+                        <button class="card-btn" @onclick="() => NavigateToVerse(hl.VerseRef)" title="Read in Chapter">
+                            📖 Read in Context
+                        </button>
+                        <button class="card-btn delete-btn" @onclick="() => DeleteHighlight(hl.Id)" title="Delete Highlight">
+                            🗑 Remove
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Highlight> highlights = new();
+    private string SortOrder { get; set; } = "recent";
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHighlightsAsync();
+    }
+
+    private async Task LoadHighlightsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            highlights = await UserDb.GetHighlightsAsync();
+            ApplySort();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplySort()
+    {
+        highlights = SortOrder switch
+        {
+            "reference" => highlights.OrderBy(h => h.VerseRef).ToList(),
+            "color" => highlights.OrderBy(h => h.Color).ThenByDescending(h => h.CreatedAt).ToList(),
+            _ => highlights.OrderByDescending(h => h.CreatedAt).ToList()
+        };
+    }
+
+    private async Task DeleteHighlight(int id)
+    {
+        await UserDb.DeleteHighlightAsync(id);
+        highlights.RemoveAll(h => h.Id == id);
+        StateHasChanged();
+    }
+
+    private void NavigateToVerse(string verseRef)
+    {
+        // Parse "Book Chapter:Verse"
+        var lastSpace = verseRef.LastIndexOf(' ');
+        if (lastSpace > 0)
+        {
+            var book = verseRef[..lastSpace];
+            var chAndV = verseRef[(lastSpace + 1)..];
+            var colonIdx = chAndV.IndexOf(':');
+            if (colonIdx > 0 && int.TryParse(chAndV[..colonIdx], out var ch))
+            {
+                int? verse = int.TryParse(chAndV[(colonIdx + 1)..], out var v) ? v : null;
+                AppState.NavigateTo(book, ch, verse);
+            }
+        }
+    }
+}
