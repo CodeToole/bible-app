@@ -37,7 +37,7 @@
                    @bind="currentNote.Title" />
 
             <div class="note-editor-instruction">
-                💡 <strong>Auto-Expansion Engine:</strong> Type scripture references like <code>EXODUS 20:1-17</code>, <code>ECCLESIASTES 12:13-14</code>, or <code>JOHN 3:16-17</code>. The right panel will automatically load full scripture text.
+                💡 <strong>Auto-Expansion Engine:</strong> Type single or multi-range references like <code>EXODUS 20:1-17</code>, <code>1 KINGS 8:27-30, 41-43</code>, or <code>JOHN 3:16, 18-21</code>. The right panel will automatically load full scripture text.
             </div>
 
             <textarea class="note-textarea" 
@@ -186,7 +186,7 @@
     private void InsertSamplePassages()
     {
         currentNote.RawContent = 
-            "The Ten Commandments:\r\nEXODUS 20:1-17\r\n\r\nThe Whole Duty of Man:\r\nECCLESIASTES 12:13-14\r\n\r\nThe Blessed Overcomers:\r\nREVELATION 22:14-15";
+            "The Ten Commandments:\r\nEXODUS 20:1-17\r\n\r\nSolomon's Dedication Prayer:\r\n1 KINGS 8:27-30, 41-43\r\n\r\nThe Whole Duty of Man:\r\nECCLESIASTES 12:13-14\r\n\r\nThe Blessed Overcomers:\r\nREVELATION 22:14-15";
         _ = TriggerExpansion();
     }
 

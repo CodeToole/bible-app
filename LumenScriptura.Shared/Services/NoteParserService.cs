@@ -19,14 +19,44 @@ public class NoteParserService
 {
     private readonly IBibleService _bibleDb;
     
-    // Regex matching references like "EXODUS 20:1-17", "1 John 1:9", "John 3:16"
+    // Regex matching references like "1 KINGS 8:27-30 41-44, 46-53", "GENESIS 1:1-5, 8-10, 12", "JOHN 3:16, 18-21", "EXODUS 20:1-17", "1 John 1:9"
     private static readonly Regex ReferenceRegex = new(
-        @"^([1-3]?\s?[A-Za-z]+(?:\s+of\s+[A-Za-z]+)?)\s+([0-9]+):([0-9]+)(?:-([0-9]+))?$",
+        @"^([1-3]?\s?[A-Za-z]+(?:\s+[A-Za-z]+)*)\s+([0-9]+)\s*:\s*([0-9\s,\-;–—]+)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex RangeRegex = new(
+        @"(\d+)(?:\s*[-–—]\s*(\d+))?",
+        RegexOptions.Compiled);
 
     public NoteParserService(IBibleService bibleDb)
     {
         _bibleDb = bibleDb;
+    }
+
+    public static List<(int Start, int End)> ParseVerseRanges(string verseStr)
+    {
+        var ranges = new List<(int Start, int End)>();
+        if (string.IsNullOrWhiteSpace(verseStr)) return ranges;
+
+        var matches = RangeRegex.Matches(verseStr);
+        foreach (Match m in matches)
+        {
+            if (int.TryParse(m.Groups[1].Value, out var start))
+            {
+                var end = m.Groups[2].Success && int.TryParse(m.Groups[2].Value, out var parsedEnd)
+                    ? parsedEnd
+                    : start;
+
+                if (start > end)
+                {
+                    (start, end) = (end, start);
+                }
+
+                ranges.Add((start, end));
+            }
+        }
+
+        return ranges;
     }
 
     public async Task<List<ScripturePassageBlock>> ParseAndExpandAsync(string rawContent)
@@ -48,35 +78,47 @@ public class NoteParserService
             if (match.Success)
             {
                 var bookName = match.Groups[1].Value.Trim();
-                var chapter = int.Parse(match.Groups[2].Value);
-                var startVerse = int.Parse(match.Groups[3].Value);
-                var endVerse = match.Groups[4].Success ? int.Parse(match.Groups[4].Value) : startVerse;
-
-                // Ensure startVerse <= endVerse
-                if (startVerse > endVerse)
+                if (int.TryParse(match.Groups[2].Value, out var chapter))
                 {
-                    (startVerse, endVerse) = (endVerse, startVerse);
-                }
+                    var verseStr = match.Groups[3].Value;
+                    var ranges = ParseVerseRanges(verseStr);
 
-                var verses = await _bibleDb.GetVerseRangeAsync(bookName, chapter, startVerse, endVerse);
-                if (verses.Count > 0)
-                {
-                    var canonBook = verses[0].BookName;
-                    var header = startVerse == endVerse 
-                        ? $"{canonBook} {chapter}:{startVerse}" 
-                        : $"{canonBook} {chapter}:{startVerse}-{endVerse}";
-
-                    blocks.Add(new ScripturePassageBlock
+                    if (ranges.Count > 0)
                     {
-                        IsScripture = true,
-                        ReferenceHeader = header,
-                        Book = canonBook,
-                        Chapter = chapter,
-                        StartVerse = startVerse,
-                        EndVerse = endVerse,
-                        Verses = verses
-                    });
-                    continue;
+                        var combinedVerses = new List<Verse>();
+                        var seenVerseNums = new HashSet<int>();
+
+                        foreach (var (start, end) in ranges)
+                        {
+                            var rangeVerses = await _bibleDb.GetVerseRangeAsync(bookName, chapter, start, end);
+                            foreach (var v in rangeVerses)
+                            {
+                                if (seenVerseNums.Add(v.VerseNum))
+                                {
+                                    combinedVerses.Add(v);
+                                }
+                            }
+                        }
+
+                        if (combinedVerses.Count > 0)
+                        {
+                            var canonBook = combinedVerses[0].BookName;
+                            var rangeSegments = ranges.Select(r => r.Start == r.End ? $"{r.Start}" : $"{r.Start}-{r.End}");
+                            var header = $"{canonBook} {chapter}:{string.Join(", ", rangeSegments)}";
+
+                            blocks.Add(new ScripturePassageBlock
+                            {
+                                IsScripture = true,
+                                ReferenceHeader = header,
+                                Book = canonBook,
+                                Chapter = chapter,
+                                StartVerse = ranges[0].Start,
+                                EndVerse = ranges[^1].End,
+                                Verses = combinedVerses
+                            });
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -104,9 +146,31 @@ public class NoteParserService
         if (!match.Success) return false;
 
         book = match.Groups[1].Value.Trim();
-        chapter = int.Parse(match.Groups[2].Value);
-        startVerse = int.Parse(match.Groups[3].Value);
-        endVerse = match.Groups[4].Success ? int.Parse(match.Groups[4].Value) : startVerse;
+        if (!int.TryParse(match.Groups[2].Value, out chapter)) return false;
+
+        var ranges = ParseVerseRanges(match.Groups[3].Value);
+        if (ranges.Count == 0) return false;
+
+        startVerse = ranges[0].Start;
+        endVerse = ranges[^1].End;
         return true;
+    }
+
+    public bool TryParseReference(string input, out string book, out int chapter, out List<(int Start, int End)> ranges)
+    {
+        book = string.Empty;
+        chapter = 0;
+        ranges = new List<(int Start, int End)>();
+
+        if (string.IsNullOrWhiteSpace(input)) return false;
+
+        var match = ReferenceRegex.Match(input.Trim());
+        if (!match.Success) return false;
+
+        book = match.Groups[1].Value.Trim();
+        if (!int.TryParse(match.Groups[2].Value, out chapter)) return false;
+
+        ranges = ParseVerseRanges(match.Groups[3].Value);
+        return ranges.Count > 0;
     }
 }
