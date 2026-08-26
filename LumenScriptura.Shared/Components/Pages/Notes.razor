@@ -3,7 +3,7 @@
 @inject AppStateService AppState
 @inject IJSRuntime JS
 
-<div class="notes-container">
+<div class="notes-container study-notes-container">
     <!-- Header -->
     <div class="notes-header-bar">
         <div class="notes-title-wrap">
@@ -38,6 +38,7 @@
 
             <div class="note-editor-instruction">
                 💡 <strong>Auto-Expansion Engine:</strong> Type single or multi-range references like <code>EXODUS 20:1-17</code>, <code>1 KINGS 8:27-30, 41-43</code>, or <code>JOHN 3:16, 18-21</code>. The right panel will automatically load full scripture text.
+            </div>
 
             <textarea class="note-textarea" 
                       placeholder="Type notes and passage references here (e.g. EXODUS 20:1-17)..." 
@@ -187,6 +188,7 @@
         currentNote.RawContent = 
             "The Ten Commandments:\r\nEXODUS 20:1-17\r\n\r\nSolomon's Dedication Prayer:\r\n1 KINGS 8:27-30, 41-43\r\n\r\nThe Whole Duty of Man:\r\nECCLESIASTES 12:13-14\r\n\r\nThe Blessed Overcomers:\r\nREVELATION 22:14-15";
         _ = TriggerExpansion();
+    }
 
     private async Task OnSelectExistingNote(ChangeEventArgs e)
     {

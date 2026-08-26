@@ -3,6 +3,11 @@
 @inject AppStateService AppState
 @implements IDisposable
 
+@if (!AppState.IsSidebarCollapsed)
+{
+    <div class="sidebar-backdrop" @onclick="CloseSidebarOnMobile"></div>
+}
+
 <aside class="sidebar @(AppState.IsSidebarCollapsed ? "collapsed" : "")">
     <!-- Branding Header -->
     <div class="sidebar-branding">
@@ -12,6 +17,7 @@
                 <span class="brand-version">King James Version</span>
                 <span class="brand-publisher" style="font-size: 0.68rem; color: #94a3b8; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px;">Waitaminute Digital</span>
             </div>
+            <button class="sidebar-close-btn mobile-only" @onclick="CloseSidebarOnMobile" title="Close Sidebar">✕</button>
         </div>
     </div>
 
@@ -21,22 +27,22 @@
         <div class="nav-section-title">Library</div>
         <div class="library-links-list">
             <button class="library-link-btn @(AppState.ActiveView == "reader" ? "active" : "")" 
-                    @onclick="@(() => AppState.SetView("reader"))">
+                    @onclick="@(() => NavigateView("reader"))">
                 <span class="library-icon">📖</span>
                 <span>Current Reader</span>
             </button>
             <button class="library-link-btn @(AppState.ActiveView == "highlights" ? "active" : "")" 
-                    @onclick="@(() => AppState.SetView("highlights"))">
+                    @onclick="@(() => NavigateView("highlights"))">
                 <span class="library-icon">✨</span>
                 <span>Highlights & Bookmarks</span>
             </button>
             <button class="library-link-btn @(AppState.ActiveView == "notes" ? "active" : "")" 
-                    @onclick="@(() => AppState.SetView("notes"))">
+                    @onclick="@(() => NavigateView("notes"))">
                 <span class="library-icon">📝</span>
                 <span>Auto-Expanded Notes</span>
             </button>
             <button class="library-link-btn @(AppState.ActiveView == "history" ? "active" : "")" 
-                    @onclick="@(() => AppState.SetView("history"))">
+                    @onclick="@(() => NavigateView("history"))">
                 <span class="library-icon">⏳</span>
                 <span>Reading History</span>
             </button>
@@ -176,11 +182,24 @@
     {
         AppState.TotalChapters = book.TotalChapters;
         AppState.NavigateTo(book.LongName, chapter);
+        AppState.SetSidebarCollapsed(true);
+    }
+
+    private void NavigateView(string view)
+    {
+        AppState.SetView(view);
+        AppState.SetSidebarCollapsed(true);
+    }
+
+    private void CloseSidebarOnMobile()
+    {
+        AppState.SetSidebarCollapsed(true);
     }
 
     private void ShowRecentReads()
     {
         AppState.SetView("history");
+        AppState.SetSidebarCollapsed(true);
     }
 
     public void Dispose()

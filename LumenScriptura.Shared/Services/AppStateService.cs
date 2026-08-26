@@ -61,6 +61,12 @@ public class AppStateService
         NotifyStateChanged();
     }
 
+    public void SetSidebarCollapsed(bool isCollapsed)
+    {
+        IsSidebarCollapsed = isCollapsed;
+        NotifyStateChanged();
+    }
+
     public void ClearTargetVerse()
     {
         TargetVerse = null;
