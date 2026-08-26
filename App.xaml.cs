@@ -11,7 +11,7 @@ public partial class App : Application
 	{
 		var window = new Window(new MainPage())
 		{
-			Title = "Lumen Scriptura — Holy Bible (King James Version)",
+			Title = "Bible Study App",
 			Width = 1280,
 			Height = 850,
 			MinimumWidth = 900,
