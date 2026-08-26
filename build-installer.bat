@@ -18,7 +18,7 @@ if "%TARGET_ARCH%"=="" (
 )
 
 echo [1/3] Publishing .NET MAUI Release Bundle for %TARGET_ARCH%...
-dotnet publish LumenScriptura.csproj -c Release -f net10.0-windows10.0.19041.0 -r %TARGET_ARCH% --self-contained true -p:UseMonoRuntime=false -p:WindowsPackageType=MSIX -p:GenerateAppxPackageOnBuild=true -p:AppxPackageSigningEnabled=false -o .\artifacts\%TARGET_ARCH%
+dotnet publish LumenScriptura.csproj -c Release -f net10.0-windows10.0.19041.0 -r %TARGET_ARCH% --self-contained true -p:UseMonoRuntime=false -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -o .\artifacts\%TARGET_ARCH%
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

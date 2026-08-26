@@ -16,9 +16,8 @@ dotnet publish LumenScriptura.csproj `
     -r $Target `
     --self-contained true `
     -p:UseMonoRuntime=false `
-    -p:WindowsPackageType=MSIX `
-    -p:GenerateAppxPackageOnBuild=true `
-    -p:AppxPackageSigningEnabled=false `
+    -p:WindowsPackageType=None `
+    -p:WindowsAppSDKSelfContained=true `
     -o "./artifacts/$Target"
 
 if ($LASTEXITCODE -ne 0) {
