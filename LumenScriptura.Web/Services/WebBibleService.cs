@@ -15,6 +15,7 @@ public class WebBibleService : IBibleService
 
     private List<Book> _books = new();
     private readonly Dictionary<string, Book> _booksByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Book> _booksByNormalizedKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, Book> _booksByNumber = new();
     private readonly Dictionary<(int BookNumber, int Chapter), List<Verse>> _chapterLookup = new();
     private List<Verse> _allVerses = new();
@@ -59,12 +60,18 @@ public class WebBibleService : IBibleService
 
             _books = payload.Books;
             _booksByName.Clear();
+            _booksByNormalizedKey.Clear();
             _booksByNumber.Clear();
             foreach (var b in _books)
             {
                 _booksByName[b.LongName] = b;
                 _booksByName[b.ShortName] = b;
                 _booksByNumber[b.BookNumber] = b;
+
+                var normLong = BibleBookAliases.NormalizeKey(b.LongName);
+                var normShort = BibleBookAliases.NormalizeKey(b.ShortName);
+                if (!string.IsNullOrEmpty(normLong)) _booksByNormalizedKey[normLong] = b;
+                if (!string.IsNullOrEmpty(normShort)) _booksByNormalizedKey[normShort] = b;
             }
 
             _allVerses = payload.Verses;
@@ -108,10 +115,28 @@ public class WebBibleService : IBibleService
         await EnsureInitializedAsync();
         if (string.IsNullOrWhiteSpace(name)) return null;
 
-        if (_booksByName.TryGetValue(name.Trim(), out var book))
+        var trimmed = name.Trim();
+
+        // 1. Direct name match
+        if (_booksByName.TryGetValue(trimmed, out var book))
         {
             return book;
         }
+
+        // 2. Common alias lookup (e.g., PS -> Psalms, REV -> Revelation, 1 KGS -> 1 Kings)
+        if (BibleBookAliases.TryGetCanonicalName(trimmed, out var canonical) &&
+            _booksByName.TryGetValue(canonical, out book))
+        {
+            return book;
+        }
+
+        // 3. Normalized key lookup (stripping spaces, periods, and punctuation)
+        var normKey = BibleBookAliases.NormalizeKey(trimmed);
+        if (_booksByNormalizedKey.TryGetValue(normKey, out book))
+        {
+            return book;
+        }
+
         return null;
     }
 

@@ -129,10 +129,29 @@ public class BibleDbService : IBibleService
 
     public async Task<Book?> GetBookByNameAsync(string name)
     {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
         var books = await GetBooksAsync();
+        var trimmed = name.Trim();
+
+        // 1. Direct match
+        var found = books.FirstOrDefault(b =>
+            b.LongName.Equals(trimmed, StringComparison.OrdinalIgnoreCase) ||
+            b.ShortName.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        if (found != null) return found;
+
+        // 2. Canonical alias lookup
+        if (BibleBookAliases.TryGetCanonicalName(trimmed, out var canonical))
+        {
+            found = books.FirstOrDefault(b => b.LongName.Equals(canonical, StringComparison.OrdinalIgnoreCase));
+            if (found != null) return found;
+        }
+
+        // 3. Normalized key lookup
+        var normKey = BibleBookAliases.NormalizeKey(trimmed);
         return books.FirstOrDefault(b =>
-            b.LongName.Equals(name, StringComparison.OrdinalIgnoreCase) ||
-            b.ShortName.Equals(name, StringComparison.OrdinalIgnoreCase));
+            BibleBookAliases.NormalizeKey(b.LongName).Equals(normKey, StringComparison.OrdinalIgnoreCase) ||
+            BibleBookAliases.NormalizeKey(b.ShortName).Equals(normKey, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<List<Verse>> GetChapterVersesAsync(string bookName, int chapter)

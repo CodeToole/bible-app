@@ -19,13 +19,13 @@ public class NoteParserService
 {
     private readonly IBibleService _bibleDb;
     
-    // Regex matching references like "1 KINGS 8:27-30 41-44, 46-53", "GENESIS 1:1-5, 8-10, 12", "JOHN 3:16, 18-21", "EXODUS 20:1-17", "1 John 1:9"
+    // Regex matching references like "1 KINGS 8:27-30 41-44, 46-53", "1KGS 8:27a-30b, 41-44", "PSALMS 23:1-6", "REV 22:14, 16a", "JOHN 3:16, 18-21"
     private static readonly Regex ReferenceRegex = new(
-        @"^([1-3]?\s?[A-Za-z]+(?:\s+[A-Za-z]+)*)\s+([0-9]+)\s*:\s*([0-9\s,\-;–—]+)$",
+        @"^([1-3]?\s?[A-Za-z]+(?:\s+[A-Za-z]+)*)\s*([0-9]+)\s*:\s*([0-9\s,\-;–—a-zA-Z]+)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex RangeRegex = new(
-        @"(\d+)(?:\s*[-–—]\s*(\d+))?",
+        @"(\d+)[a-zA-Z]*(?:\s*[-–—]\s*(\d+)[a-zA-Z]*)?",
         RegexOptions.Compiled);
 
     public NoteParserService(IBibleService bibleDb)
@@ -38,21 +38,30 @@ public class NoteParserService
         var ranges = new List<(int Start, int End)>();
         if (string.IsNullOrWhiteSpace(verseStr)) return ranges;
 
-        var matches = RangeRegex.Matches(verseStr);
-        foreach (Match m in matches)
+        // Split by comma or semicolon to preserve explicit list boundaries
+        var segments = verseStr.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var rawSegment in segments)
         {
-            if (int.TryParse(m.Groups[1].Value, out var start))
+            var segment = rawSegment.Trim();
+            if (string.IsNullOrEmpty(segment)) continue;
+
+            // In each segment, find all range/verse matches (handles space-separated ranges within segment too)
+            var matches = RangeRegex.Matches(segment);
+            foreach (Match m in matches)
             {
-                var end = m.Groups[2].Success && int.TryParse(m.Groups[2].Value, out var parsedEnd)
-                    ? parsedEnd
-                    : start;
-
-                if (start > end)
+                if (int.TryParse(m.Groups[1].Value, out var start))
                 {
-                    (start, end) = (end, start);
-                }
+                    var end = m.Groups[2].Success && int.TryParse(m.Groups[2].Value, out var parsedEnd)
+                        ? parsedEnd
+                        : start;
 
-                ranges.Add((start, end));
+                    if (start > end)
+                    {
+                        (start, end) = (end, start);
+                    }
+
+                    ranges.Add((start, end));
+                }
             }
         }
 
@@ -77,7 +86,12 @@ public class NoteParserService
             var match = ReferenceRegex.Match(trimmed);
             if (match.Success)
             {
-                var bookName = match.Groups[1].Value.Trim();
+                var rawBookName = match.Groups[1].Value.Trim();
+                var book = await _bibleDb.GetBookByNameAsync(rawBookName);
+                var bookName = book != null 
+                    ? book.LongName 
+                    : (BibleBookAliases.TryGetCanonicalName(rawBookName, out var canon) ? canon : rawBookName);
+
                 if (int.TryParse(match.Groups[2].Value, out var chapter))
                 {
                     var verseStr = match.Groups[3].Value;
@@ -102,7 +116,7 @@ public class NoteParserService
 
                         if (combinedVerses.Count > 0)
                         {
-                            var canonBook = combinedVerses[0].BookName;
+                            var canonBook = book?.LongName ?? combinedVerses[0].BookName ?? bookName;
                             var rangeSegments = ranges.Select(r => r.Start == r.End ? $"{r.Start}" : $"{r.Start}-{r.End}");
                             var header = $"{canonBook} {chapter}:{string.Join(", ", rangeSegments)}";
 
@@ -145,7 +159,9 @@ public class NoteParserService
         var match = ReferenceRegex.Match(input.Trim());
         if (!match.Success) return false;
 
-        book = match.Groups[1].Value.Trim();
+        var rawBook = match.Groups[1].Value.Trim();
+        book = BibleBookAliases.TryGetCanonicalName(rawBook, out var canon) ? canon : rawBook;
+
         if (!int.TryParse(match.Groups[2].Value, out chapter)) return false;
 
         var ranges = ParseVerseRanges(match.Groups[3].Value);
@@ -167,7 +183,9 @@ public class NoteParserService
         var match = ReferenceRegex.Match(input.Trim());
         if (!match.Success) return false;
 
-        book = match.Groups[1].Value.Trim();
+        var rawBook = match.Groups[1].Value.Trim();
+        book = BibleBookAliases.TryGetCanonicalName(rawBook, out var canon) ? canon : rawBook;
+
         if (!int.TryParse(match.Groups[2].Value, out chapter)) return false;
 
         ranges = ParseVerseRanges(match.Groups[3].Value);
