@@ -54,3 +54,4 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_NICE_COAST_05E9A7E10 }}
           action: "close"
+          app_location: "/"
