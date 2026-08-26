@@ -54,6 +54,7 @@
         <!-- Publish & Runtime Performance Optimizations -->
         <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
         <TieredCompilation>true</TieredCompilation>
+        <DefaultItemExcludes>$(DefaultItemExcludes);LumenScriptura.Shared\**;LumenScriptura.Web\**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
@@ -83,6 +84,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="LumenScriptura.Shared\LumenScriptura.Shared.csproj" />
         <None Update="wwwroot\kjv.sqlite">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

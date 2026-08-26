@@ -3,6 +3,8 @@
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+artifacts/
+publish/
 
 ## Visual Studio / VS Code
 .vs/

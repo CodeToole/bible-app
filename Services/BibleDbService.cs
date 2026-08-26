@@ -4,7 +4,7 @@ using LumenScriptura.Models;
 
 namespace LumenScriptura.Services;
 
-public class BibleDbService
+public class BibleDbService : IBibleService
 {
     private readonly string _connectionString;
     private static readonly Regex StrongAndNoteRegex = new(@"<(?:S|n)>[^<]*</(?:S|n)>", RegexOptions.Compiled | RegexOptions.IgnoreCase);

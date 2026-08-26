@@ -15,8 +15,10 @@ public static class MauiProgram
 			});
 
 		builder.Services.AddMauiBlazorWebView();
-		builder.Services.AddSingleton<LumenScriptura.Services.BibleDbService>();
-		builder.Services.AddSingleton<LumenScriptura.Services.UserDbService>();
+		builder.Services.AddSingleton<LumenScriptura.Services.IBibleService, LumenScriptura.Services.BibleDbService>();
+		builder.Services.AddSingleton<LumenScriptura.Services.IUserDbService, LumenScriptura.Services.UserDbService>();
+		builder.Services.AddSingleton<LumenScriptura.Services.BibleDbService>(sp => (LumenScriptura.Services.BibleDbService)sp.GetRequiredService<LumenScriptura.Services.IBibleService>());
+		builder.Services.AddSingleton<LumenScriptura.Services.UserDbService>(sp => (LumenScriptura.Services.UserDbService)sp.GetRequiredService<LumenScriptura.Services.IUserDbService>());
 		builder.Services.AddSingleton<LumenScriptura.Services.NoteParserService>();
 		builder.Services.AddSingleton<LumenScriptura.Services.AppStateService>();
 

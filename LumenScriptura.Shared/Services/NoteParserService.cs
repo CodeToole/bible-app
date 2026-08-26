@@ -17,14 +17,14 @@ public class ScripturePassageBlock
 
 public class NoteParserService
 {
-    private readonly BibleDbService _bibleDb;
+    private readonly IBibleService _bibleDb;
     
     // Regex matching references like "EXODUS 20:1-17", "1 John 1:9", "John 3:16"
     private static readonly Regex ReferenceRegex = new(
         @"^([1-3]?\s?[A-Za-z]+(?:\s+of\s+[A-Za-z]+)?)\s+([0-9]+):([0-9]+)(?:-([0-9]+))?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public NoteParserService(BibleDbService bibleDb)
+    public NoteParserService(IBibleService bibleDb)
     {
         _bibleDb = bibleDb;
     }

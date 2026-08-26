@@ -3,7 +3,7 @@ using LumenScriptura.Models;
 
 namespace LumenScriptura.Services;
 
-public class UserDbService
+public class UserDbService : IUserDbService
 {
     private readonly string _connectionString;
     private bool _initialized;
