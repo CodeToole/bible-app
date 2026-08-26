@@ -46,15 +46,15 @@ jobs:
           path: ./artifacts/${{ matrix.target }}/
 
       - name: Install Inno Setup
-        if: matrix.target == 'win-x64'
+        if: matrix.target == 'win-arm64'
         run: choco install innosetup -y
 
       - name: Compile Windows Installer Wizard
-        if: matrix.target == 'win-x64'
+        if: matrix.target == 'win-arm64'
         run: iscc installer.iss
 
       - name: Upload Installer Artifact
-        if: matrix.target == 'win-x64'
+        if: matrix.target == 'win-arm64'
         uses: actions/upload-artifact@v4
         with:
           name: BibleStudyApp-Setup-Wizard
