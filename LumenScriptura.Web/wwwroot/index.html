@@ -33,6 +33,64 @@
         <span class="dismiss">🗙</span>
     </div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJOMU0dAR0EjstGGgXNwCJDiZAw9vWSFg",
+            authDomain: "bible-study-ap.firebaseapp.com",
+            projectId: "bible-study-ap",
+            storageBucket: "bible-study-ap.firebasestorage.app",
+            messagingSenderId: "518267383585",
+            appId: "1:518267383585:web:9512298f5e5ca43c9c5860"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.firebaseAuth = {
+            loginWithGoogle: async () => {
+                const provider = new GoogleAuthProvider();
+                const res = await signInWithPopup(auth, provider);
+                return { uid: res.user.uid, email: res.user.email, displayName: res.user.displayName };
+            },
+            loginWithMicrosoft: async () => {
+                const provider = new OAuthProvider('microsoft.com');
+                const res = await signInWithPopup(auth, provider);
+                return { uid: res.user.uid, email: res.user.email, displayName: res.user.displayName };
+            },
+            loginAnonymously: async () => {
+                const res = await signInAnonymously(auth);
+                return { uid: res.user.uid, email: "Guest User", displayName: "Guest" };
+            },
+            logout: async () => {
+                await signOut(auth);
+            },
+            getCurrentUser: () => {
+                if (!auth.currentUser) return null;
+                return {
+                    uid: auth.currentUser.uid,
+                    email: auth.currentUser.email || (auth.currentUser.isAnonymous ? "Guest User" : ""),
+                    displayName: auth.currentUser.displayName || (auth.currentUser.isAnonymous ? "Guest" : "User")
+                };
+            },
+            onAuthStateChanged: (dotNetRef) => {
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        dotNetRef.invokeMethodAsync('OnUserChanged', {
+                            uid: user.uid,
+                            email: user.email || (user.isAnonymous ? "Guest User" : ""),
+                            displayName: user.displayName || (user.isAnonymous ? "Guest" : "User")
+                        });
+                    } else {
+                        dotNetRef.invokeMethodAsync('OnUserChanged', null);
+                    }
+                });
+            }
+        };
+    </script>
+
     <script src="_framework/blazor.webassembly.js"></script>
     <script>
         window.clipboardHelper = {

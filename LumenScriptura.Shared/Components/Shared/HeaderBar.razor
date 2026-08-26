@@ -1,4 +1,5 @@
 @inject AppStateService AppState
+@inject AuthService Auth
 @implements IDisposable
 
 <header class="header-bar">
@@ -47,13 +48,92 @@
             <span>🔍 Search Scriptures...</span>
             <kbd class="search-kbd">Ctrl+K</kbd>
         </button>
+
+        @if (Auth.IsAvailable)
+        {
+            <div class="auth-section">
+                @if (Auth.CurrentUser != null && Auth.CurrentUser.IsAuthenticated)
+                {
+                    <div class="auth-user-dropdown-wrap">
+                        <button class="auth-user-btn" @onclick="ToggleUserMenu" title="User Profile">
+                            <span class="user-avatar-icon">👤</span>
+                            <span class="user-display-name">@(string.IsNullOrWhiteSpace(Auth.CurrentUser.DisplayName) ? "User" : Auth.CurrentUser.DisplayName)</span>
+                            <span class="dropdown-caret">▾</span>
+                        </button>
+
+                        @if (isUserMenuOpen)
+                        {
+                            <div class="auth-dropdown-menu">
+                                <div class="auth-user-detail">
+                                    <div class="user-detail-name">@Auth.CurrentUser.DisplayName</div>
+                                    @if (!string.IsNullOrWhiteSpace(Auth.CurrentUser.Email) && Auth.CurrentUser.Email != Auth.CurrentUser.DisplayName)
+                                    {
+                                        <div class="user-detail-email">@Auth.CurrentUser.Email</div>
+                                    }
+                                </div>
+                                <div class="auth-menu-divider"></div>
+                                <button class="auth-menu-item signout" @onclick="SignOut">
+                                    <span>🚪 Sign Out</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="auth-login-dropdown-wrap">
+                        <button class="auth-signin-trigger-btn" @onclick="ToggleLoginMenu" disabled="@Auth.IsLoading">
+                            @if (Auth.IsLoading)
+                            {
+                                <span>Signing In...</span>
+                            }
+                            else
+                            {
+                                <span>🔑 Sign In ▾</span>
+                            }
+                        </button>
+
+                        @if (isLoginMenuOpen && !Auth.IsLoading)
+                        {
+                            <div class="auth-dropdown-menu">
+                                <button class="auth-menu-item google" @onclick="LoginGoogle">
+                                    <span class="provider-badge">G</span>
+                                    <span>Sign in with Google</span>
+                                </button>
+                                <button class="auth-menu-item microsoft" @onclick="LoginMicrosoft">
+                                    <span class="provider-badge">⊞</span>
+                                    <span>Sign in with Microsoft</span>
+                                </button>
+                                <div class="auth-menu-divider"></div>
+                                <button class="auth-menu-item guest" @onclick="LoginGuest">
+                                    <span class="provider-badge">👤</span>
+                                    <span>Continue as Guest</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Auth.ErrorMessage))
+                {
+                    <div class="auth-error-toast" title="@Auth.ErrorMessage">
+                        ⚠️ @Auth.ErrorMessage
+                    </div>
+                }
+            </div>
+        }
     </div>
 </header>
 
 @code {
-    protected override void OnInitialized()
+    private bool isLoginMenuOpen;
+    private bool isUserMenuOpen;
+
+    protected override async Task OnInitializedAsync()
     {
         AppState.OnChange += StateHasChanged;
+        Auth.OnChange += StateHasChanged;
+        await Auth.InitializeAsync();
     }
 
     private void ToggleSidebar()
@@ -66,8 +146,45 @@
         AppState.SetSearchOpen(true);
     }
 
+    private void ToggleLoginMenu()
+    {
+        isLoginMenuOpen = !isLoginMenuOpen;
+        isUserMenuOpen = false;
+    }
+
+    private void ToggleUserMenu()
+    {
+        isUserMenuOpen = !isUserMenuOpen;
+        isLoginMenuOpen = false;
+    }
+
+    private async Task LoginGoogle()
+    {
+        isLoginMenuOpen = false;
+        await Auth.SignInWithGoogleAsync();
+    }
+
+    private async Task LoginMicrosoft()
+    {
+        isLoginMenuOpen = false;
+        await Auth.SignInWithMicrosoftAsync();
+    }
+
+    private async Task LoginGuest()
+    {
+        isLoginMenuOpen = false;
+        await Auth.SignInAnonymouslyAsync();
+    }
+
+    private async Task SignOut()
+    {
+        isUserMenuOpen = false;
+        await Auth.SignOutAsync();
+    }
+
     public void Dispose()
     {
         AppState.OnChange -= StateHasChanged;
+        Auth.OnChange -= StateHasChanged;
     }
 }

@@ -16,5 +16,6 @@ builder.Services.AddScoped<IBibleService, WebBibleService>();
 builder.Services.AddScoped<IUserDbService, WebUserDbService>();
 builder.Services.AddScoped<AppStateService>();
 builder.Services.AddScoped<NoteParserService>();
+builder.Services.AddScoped<AuthService>();
 
 await builder.Build().RunAsync();

@@ -21,6 +21,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<LumenScriptura.Services.UserDbService>(sp => (LumenScriptura.Services.UserDbService)sp.GetRequiredService<LumenScriptura.Services.IUserDbService>());
 		builder.Services.AddSingleton<LumenScriptura.Services.NoteParserService>();
 		builder.Services.AddSingleton<LumenScriptura.Services.AppStateService>();
+		builder.Services.AddSingleton<LumenScriptura.Services.AuthService>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
