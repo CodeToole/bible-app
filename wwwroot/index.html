@@ -35,6 +35,11 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="icon" href="data:,">
+    <style>
+        #blazor-error-ui {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -45,7 +50,7 @@
         </div>
     </div>
 
-    <div id="blazor-error-ui" data-nosnippet>
+    <div id="blazor-error-ui" data-nosnippet style="display: none !important;">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>

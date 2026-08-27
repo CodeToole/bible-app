@@ -164,8 +164,15 @@
             AppState.ClearTargetVerse();
             _ = Task.Run(async () =>
             {
-                await Task.Delay(200);
-                await JS.InvokeVoidAsync("uiHelper.scrollToElement", $"verse-{vNum}");
+                try
+                {
+                    await Task.Delay(200);
+                    await JS.InvokeVoidAsync("uiHelper.scrollToElement", $"verse-{vNum}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Reader] Scroll error: {ex.Message}");
+                }
             });
         }
     }
@@ -208,10 +215,17 @@
     private async Task CopyVerse()
     {
         if (selectedVerse == null) return;
-        var copyText = $"\"{selectedVerse.Text}\" — {selectedVerse.Reference} (KJV)";
-        await JS.InvokeVoidAsync("clipboardHelper.copyText", copyText);
-        copied = true;
-        StateHasChanged();
+        try
+        {
+            var copyText = $"\"{selectedVerse.Text}\" — {selectedVerse.Reference} (KJV)";
+            await JS.InvokeVoidAsync("clipboardHelper.copyText", copyText);
+            copied = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Reader] Copy error: {ex.Message}");
+        }
     }
 
     public void Dispose()

@@ -65,6 +65,12 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Suppress Blazor unhandled error banner so non-fatal JS interop warnings do not display a bottom banner */
+#blazor-error-ui,
+.blazor-error-ui {
+    display: none !important;
+}
+
 /* App Loading Screen */
 .app-initial-loader {
     display: flex;

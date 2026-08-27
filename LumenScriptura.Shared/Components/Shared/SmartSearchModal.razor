@@ -2,11 +2,12 @@
 @inject IBibleService BibleDb
 @inject NoteParserService NoteParser
 @inject AppStateService AppState
+@inject IJSRuntime JS
 @implements IDisposable
 
 @if (AppState.IsSearchOpen)
 {
-    <div class="modal-overlay" @onclick="CloseModal">
+    <div class="modal-overlay" @onclick="Close" @onkeydown="HandleKeyDown" tabindex="-1">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <!-- Modal Header & Search Box -->
             <div class="modal-search-header">
@@ -16,9 +17,10 @@
                        placeholder="Type a book (e.g. 'ja'), chapter ('James 3'), verse ('John 3:16'), or keywords..." 
                        @bind="SearchQuery" 
                        @bind:event="oninput" 
+                       @onkeydown="HandleKeyDown"
                        @ref="searchInputRef"
                        autofocus />
-                <button class="search-close-btn" @onclick="CloseModal" title="Close (Esc)">✕</button>
+                <button class="search-close-btn" @onclick="Close" title="Close (Esc)">✕</button>
             </div>
 
             <!-- Results Scroll Area -->
@@ -141,6 +143,8 @@
     private string searchQuery = string.Empty;
     private ElementReference searchInputRef;
     private bool isLoading;
+    private bool wasOpen = false;
+    private bool shouldFocusInput = false;
 
     private Verse? matchedVerse;
     private (Book book, int chapter)? matchedChapterJump;
@@ -165,13 +169,63 @@
 
     protected override async Task OnInitializedAsync()
     {
-        AppState.OnChange += StateHasChanged;
+        wasOpen = AppState.IsSearchOpen;
+        AppState.OnChange += HandleAppStateChange;
         allBooks = await BibleDb.GetBooksAsync();
+    }
+
+    private void HandleAppStateChange()
+    {
+        if (AppState.IsSearchOpen != wasOpen)
+        {
+            wasOpen = AppState.IsSearchOpen;
+            ResetSearch();
+            if (wasOpen)
+            {
+                shouldFocusInput = true;
+            }
+        }
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldFocusInput && AppState.IsSearchOpen)
+        {
+            shouldFocusInput = false;
+            try
+            {
+                await searchInputRef.FocusAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SmartSearchModal] Focus error: {ex.Message}");
+            }
+        }
+    }
+
+    public void ResetSearch()
+    {
+        searchCts?.Cancel();
+        searchQuery = string.Empty;
+        isLoading = false;
+        matchedVerse = null;
+        matchedChapterJump = null;
+        suggestedBooks.Clear();
+        keywordResults.Clear();
     }
 
     private void SetSample(string sample)
     {
         SearchQuery = sample;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+        }
     }
 
     private void TriggerSearch()
@@ -280,25 +334,54 @@
         {
             AppState.TotalChapters = book.TotalChapters;
         }
+        ResetSearch();
+        AppState.SetSearchOpen(false);
         AppState.NavigateTo(verse.BookName, verse.Chapter, verse.VerseNum);
-        CloseModal();
     }
 
     private void JumpToChapter(Book book, int chapter)
     {
         AppState.TotalChapters = book.TotalChapters;
+        ResetSearch();
+        AppState.SetSearchOpen(false);
         AppState.NavigateTo(book.LongName, chapter);
-        CloseModal();
     }
 
-    private void CloseModal()
+    private void Close()
     {
+        ResetSearch();
         AppState.SetSearchOpen(false);
+    }
+
+    private void CloseModal() => Close();
+
+    private async Task SafeScrollToElement(string id)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("uiHelper.scrollToElement", id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SmartSearchModal] Scroll error: {ex.Message}");
+        }
+    }
+
+    private async Task SafeCopyText(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("clipboardHelper.copyText", text);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SmartSearchModal] Copy error: {ex.Message}");
+        }
     }
 
     public void Dispose()
     {
-        AppState.OnChange -= StateHasChanged;
+        AppState.OnChange -= HandleAppStateChange;
         searchCts?.Dispose();
     }
 }
