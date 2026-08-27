@@ -18,6 +18,23 @@ public class UserDbService : IUserDbService
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(FileSystem.AppDataDirectory))
+            {
+                var dir = FileSystem.AppDataDirectory;
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                return Path.Combine(dir, "user_data.db");
+            }
+        }
+        catch
+        {
+            // Ignore if FileSystem.AppDataDirectory is unavailable
+        }
+
+        try
+        {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LumenScriptura");
             if (!Directory.Exists(dir))
             {
@@ -27,7 +44,7 @@ public class UserDbService : IUserDbService
         }
         catch
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "user_data.db");
+            return Path.Combine(AppContext.BaseDirectory, "user_data.db");
         }
     }
 

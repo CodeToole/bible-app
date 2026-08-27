@@ -70,27 +70,55 @@ public class BibleDbService : IBibleService
 
     private static string ResolveDatabasePath()
     {
-        var candidatePaths = new[]
+        var candidatePaths = new List<string>();
+
+        try
         {
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "kjv.sqlite"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "kjv.sqlite"),
-            Path.Combine(AppContext.BaseDirectory, "wwwroot", "kjv.sqlite"),
-            Path.Combine(AppContext.BaseDirectory, "kjv.sqlite"),
-            Path.Combine(Environment.CurrentDirectory, "wwwroot", "kjv.sqlite"),
-            Path.Combine(Environment.CurrentDirectory, "kjv.sqlite"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LumenScriptura", "kjv.sqlite"),
-            @"C:\Users\CorneliusToole\Downloads\bible app\wwwroot\kjv.sqlite"
-        };
+            if (!string.IsNullOrWhiteSpace(FileSystem.AppDataDirectory))
+            {
+                candidatePaths.Add(Path.Combine(FileSystem.AppDataDirectory, "kjv.sqlite"));
+                candidatePaths.Add(Path.Combine(FileSystem.AppDataDirectory, "wwwroot", "kjv.sqlite"));
+            }
+        }
+        catch
+        {
+            // Ignore if FileSystem.AppDataDirectory is unavailable
+        }
+
+        try
+        {
+            candidatePaths.AddRange(new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "kjv.sqlite"),
+                Path.Combine(AppContext.BaseDirectory, "kjv.sqlite"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "kjv.sqlite"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "kjv.sqlite"),
+                Path.Combine(Environment.CurrentDirectory, "wwwroot", "kjv.sqlite"),
+                Path.Combine(Environment.CurrentDirectory, "kjv.sqlite"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LumenScriptura", "kjv.sqlite")
+            });
+        }
+        catch
+        {
+            // Ignore path evaluation errors
+        }
 
         foreach (var path in candidatePaths)
         {
-            if (File.Exists(path))
+            try
             {
-                return path;
+                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                {
+                    return path;
+                }
+            }
+            catch
+            {
+                // Continue checking other candidates
             }
         }
 
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "kjv.sqlite");
+        return Path.Combine(AppContext.BaseDirectory, "wwwroot", "kjv.sqlite");
     }
 
     public async Task<List<Book>> GetBooksAsync()
