@@ -50,11 +50,11 @@ jobs:
 
       - name: Compile Windows Installer Wizard
         if: matrix.target == 'win-arm64'
-        run: iscc installer.iss
+        run: iscc /DTargetArch=win-arm64 /O"publish/installer-arm64" installer.iss
 
       - name: Upload Installer Artifact
         if: matrix.target == 'win-arm64'
         uses: actions/upload-artifact@v4
         with:
-          name: BibleStudyApp-Setup-Wizard
-          path: ./artifacts/installer/BibleStudyApp-Setup.exe
+          name: BibleStudyApp-Setup-Wizard-arm64
+          path: ./publish/installer-arm64/BibleStudyApp-Setup-Wizard-arm64.exe

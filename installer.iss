@@ -3,6 +3,30 @@
 #define MyAppPublisher "Waitaminute Digital"
 #define MyAppExeName "LumenScriptura.exe"
 
+#ifndef TargetArch
+  #define TargetArch "win-arm64"
+#endif
+
+#ifndef PublishDir
+  #ifdef TargetPublishDir
+    #define PublishDir TargetPublishDir
+  #else
+    #define PublishDir "artifacts\" + TargetArch
+  #endif
+#endif
+
+#ifndef OutputBaseFilename
+  #ifdef OutputFileName
+    #define OutputBaseFilename OutputFileName
+  #elif TargetArch == "win-arm64" || TargetArch == "arm64"
+    #define OutputBaseFilename "BibleStudyApp-Setup-Wizard-arm64"
+  #elif TargetArch == "win-x64" || TargetArch == "x64"
+    #define OutputBaseFilename "BibleStudyApp-Setup-Wizard-x64"
+  #else
+    #define OutputBaseFilename "BibleStudyApp-Setup-Wizard-" + TargetArch
+  #endif
+#endif
+
 [Setup]
 AppId={{A9E8D12F-4C5A-4B9D-8E12-7F3A910B8C7D}
 AppName={#MyAppName}
@@ -16,18 +40,18 @@ VersionInfoVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=./artifacts/installer
-OutputBaseFilename=BibleStudyApp-Setup
+OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=arm64 x64compatible
-ArchitecturesInstallIn64BitMode=arm64 x64compatible
+ArchitecturesAllowed=x64 arm64
+ArchitecturesInstallIn64BitMode=x64 arm64
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "artifacts\win-arm64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
